@@ -11,19 +11,16 @@ import CoreData
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
+    @State private var model = ContentViewModel()
     @State private var presentedItems: [Item] = []
 
     var body: some View {
         NavigationStack(path: $presentedItems) {
             List {
-                if items.isEmpty {
+                if model.items.isEmpty {
                     Text("No items.")
                 }
-                ForEach(items) { item in
+                ForEach(model.items) { item in
                     NavigationLink(value: item) {
                         RowView(item: item)
                     }
@@ -44,6 +41,14 @@ struct ContentView: View {
                     }
                 }
             }
+            .onAppear {
+                do {
+                    try model.load(context: viewContext)
+                    print("appear: \(model.items.count)")
+                } catch {
+                    print(error)
+                }
+            }
         }
     }
 
@@ -57,7 +62,7 @@ struct ContentView: View {
 
     private func deleteItems(offsets: IndexSet) {
         withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
+            offsets.map { model.items[$0] }.forEach(viewContext.delete)
 
             do {
                 try viewContext.save()
@@ -68,6 +73,16 @@ struct ContentView: View {
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
             }
         }
+    }
+}
+
+class ContentViewModel: ObservableObject {
+    @Published var items: [Item] = []
+    
+    func load(context: NSManagedObjectContext) throws {
+        let request = Item.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)]
+        items = try context.fetch(request)
     }
 }
 

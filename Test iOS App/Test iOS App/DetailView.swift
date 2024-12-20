@@ -32,6 +32,7 @@ struct DetailView: View {
         .onDisappear {
             do {
                 try viewContext.save()
+                print("here")
             } catch {
                 print(error)
             }
