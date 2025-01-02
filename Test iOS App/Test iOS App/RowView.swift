@@ -6,8 +6,15 @@
 //
 
 import SwiftUI
-
+extension Item {
+    // Remove `ObservableObject` conformance from here
+    public override func willChangeValue(forKey key: String) {
+        objectWillChange.send()
+        super.willChangeValue(forKey: key)
+    }
+}
 struct RowView: View {
+    
     let item: Item
     
     var body: some View {
@@ -23,7 +30,7 @@ struct RowView: View {
                 Spacer()
             }
         }
-    }
+    }    
 }
 
 private let itemFormatter: DateFormatter = {

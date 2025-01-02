@@ -11,7 +11,7 @@ struct DetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     
     @ObservedObject var item: Item
-    
+    var onSave: () -> Void
     var body: some View {
         Form {
             TextField(
@@ -32,8 +32,9 @@ struct DetailView: View {
         .onDisappear {
             do {
                 try viewContext.save()
+                onSave()
             } catch {
-                print(error)
+                print("Failed to save context: \(error)")
             }
         }
     }
@@ -53,5 +54,7 @@ func OptionalBinding<T>(
     let persistence = PersistenceController.preview
     let request = Item.fetchRequest()
     let items = try! persistence.container.viewContext.fetch(request)
-    DetailView(item: items[0])
+    DetailView(item: items[0], onSave: {
+        print("Save triggered")
+    })
 }

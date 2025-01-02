@@ -10,12 +10,13 @@ import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-
+    @State private var refreshID = UUID()
+    @State private var model = ContentViewModel()
+    @State private var presentedItems: [Item] = []
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
-    @State private var presentedItems: [Item] = []
+        animation: .default
+    ) private var items: FetchedResults<Item>
 
     var body: some View {
         NavigationStack(path: $presentedItems) {
@@ -30,8 +31,9 @@ struct ContentView: View {
                 }
                 .onDelete(perform: deleteItems)
             }
+
             .navigationDestination(for: Item.self) { item in
-                DetailView(item: item)
+                DetailView(item: item,onSave: { refreshID = UUID() })
             }
             .navigationTitle("My Items")
             .toolbar {
@@ -44,7 +46,22 @@ struct ContentView: View {
                     }
                 }
             }
-        }
+            .onAppear {
+                do {
+                    try model.load(context: viewContext)
+                    do {
+                            let request: NSFetchRequest<Item> = Item.fetchRequest()
+                            request.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
+                            let results = try viewContext.fetch(request)
+                        } catch {
+                            print("Fetch error: \(error)")
+                        }
+                } catch {
+                    print(error)
+                }
+            }
+        }.id(refreshID)
+
     }
 
     private func addItem() {
@@ -57,17 +74,29 @@ struct ContentView: View {
 
     private func deleteItems(offsets: IndexSet) {
         withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
+               for index in offsets {
+                   let itemToDelete = model.items[index]
+                   viewContext.delete(itemToDelete)
+               }
+               do {
+                   try viewContext.save()
+                   model.items.remove(atOffsets: offsets)
+               } catch {
+                   let nsError = error as NSError
+                   fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+               }
+           }
+    }
 
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
+}
+
+class ContentViewModel: ObservableObject {
+    @Published var items: [Item] = []
+    
+    func load(context: NSManagedObjectContext) throws {
+        let request = Item.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)]
+        items = try context.fetch(request)
     }
 }
 
